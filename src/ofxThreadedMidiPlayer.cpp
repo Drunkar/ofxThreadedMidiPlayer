@@ -20,12 +20,12 @@ ofxThreadedMidiPlayer::ofxThreadedMidiPlayer(){
     bIsInited = false;
 }
 ofxThreadedMidiPlayer::~ofxThreadedMidiPlayer(){
-    cout << __PRETTY_FUNCTION__ << endl;
+    ofLogVerbose("ofxThreadedMidiPlayer::~ofxThreadedMidiPlayer") << "Function Called.";
     stop();
     clean();
 }
 void ofxThreadedMidiPlayer::stop(){
-    cout << __PRETTY_FUNCTION__ << endl;
+    ofLogVerbose("ofxThreadedMidiPlayer::stop") << "Function Called.";
     stopThread();
     waitForThread();
     // clean();
@@ -170,7 +170,7 @@ void ofxThreadedMidiPlayer::threadedFunction(){
     }
 }
 void ofxThreadedMidiPlayer::clean(){
-    cout << __PRETTY_FUNCTION__ << endl;
+    ofLogVerbose("ofxThreadedMidiPlayer::clean") << "Function Called.";
     if(tracks){
         delete tracks;
         tracks = NULL;
@@ -211,11 +211,11 @@ void ofxThreadedMidiPlayer::init(){
         int midiFormat = reader.GetFormat();
 
         tracks->ClearAndResize( numMidiTracks );
-        cout << "numMidiTracks: " << numMidiTracks << endl;
-        cout << "midiFormat: " << midiFormat << endl;
+        ofLogVerbose("ofxThreadedMidiPlayer::init") << "numMidiTracks: " << numMidiTracks;
+        ofLogVerbose("ofxThreadedMidiPlayer::init") << "midiFormat: " << midiFormat;
 
         if ( reader.Parse() ){
-            cout << "reader parsed!: " << endl;
+            ofLogVerbose("ofxThreadedMidiPlayer::init") << "reader parsed!: ";
         }
 
         //MIDISequencer seq( &tracks );

@@ -12,7 +12,7 @@
 #include "ofxMidi.h"
 
 
-class ofxThreadedMidiPlayer: public ofThread{
+class ofxThreadedMidiPlayer: public ofThread {
 public:
     int count;
     bool isReady;
@@ -22,31 +22,27 @@ public:
     float nextEventTime;
 
     double musicDurationInSeconds;
-    float max_time;
+    float maxTime;
     long myTime;
     bool doLoop;
 
     jdksmidi::MIDIMultiTrack *tracks;
     jdksmidi::MIDISequencer *sequencer;
     jdksmidi::MIDITimedBigMessage lastTimedBigMessage;
-
-    RtMidiOut *midiout;
+    RtMidiOut *midiOut;
+    ofxMidiEvent midiEvent;
 
     ofxThreadedMidiPlayer();
     ~ofxThreadedMidiPlayer();
-    void stop();
-    void DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBigMessage& msg );
     void start();
-
-    void setup(string fileName, int portNumber, bool shouldLoop = true);
-    void threadedFunction();
+    void stop();
     void clean();
-
-    ofxMidiEvent midiEvent;
+    void threadedFunction();
+    void setup(string fileName, int portNumber, bool shouldLoop = true);
+    void DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBigMessage& msg );
 
 protected:
-    void dispatchMidiEvent(float currentTime, float timeDelta, vector<unsigned char>& message);
-    bool bIsInited;
-
+    bool isInited;
     void init();
+    void dispatchMidiEvent(float currentTime, float timeDelta, vector<unsigned char>& message);
 };

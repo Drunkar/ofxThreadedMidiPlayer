@@ -1,38 +1,43 @@
 #include "ofxThreadedMidiPlayer.h"
 
 
-ofxThreadedMidiPlayer::ofxThreadedMidiPlayer(){
+ofxThreadedMidiPlayer::ofxThreadedMidiPlayer() {
     count = 0;
     midiFileName = "";
     midiPort = 0;
     currentTime = 0.0;
     nextEventTime = 0.0;
-    
+
     musicDurationInSeconds = 0;
-    max_time = 0;
+    maxTime = 0;
     myTime = 0;
     //        lastTimedBigMessage = new MIDITimedBigMessage();
     tracks = NULL;
     sequencer = NULL;
-    midiout = NULL;
+    midiOut = NULL;
     doLoop = true;
     isReady = true;
-    bIsInited = false;
+    isInited = false;
 }
-ofxThreadedMidiPlayer::~ofxThreadedMidiPlayer(){
+
+
+ofxThreadedMidiPlayer::~ofxThreadedMidiPlayer() {
     ofLogVerbose("ofxThreadedMidiPlayer::~ofxThreadedMidiPlayer") << "Function Called.";
     stop();
     clean();
 }
-void ofxThreadedMidiPlayer::stop(){
+
+
+void ofxThreadedMidiPlayer::stop() {
     ofLogVerbose("ofxThreadedMidiPlayer::stop") << "Function Called.";
     stopThread();
     waitForThread();
     // clean();
 
 }
-void ofxThreadedMidiPlayer::DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBigMessage& msg )
-{
+
+
+void ofxThreadedMidiPlayer::DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBigMessage& msg ) {
     char msgbuf[1024];
     lastTimedBigMessage.Copy(msg);
 
@@ -55,63 +60,69 @@ void ofxThreadedMidiPlayer::DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBi
     }
     //*/
 }
-void ofxThreadedMidiPlayer::start(){
+
+
+void ofxThreadedMidiPlayer::start() {
     startThread();
 }
 
-void ofxThreadedMidiPlayer::setup(string fileName, int portNumber, bool shouldLoop){
+
+void ofxThreadedMidiPlayer::setup(string fileName, int portNumber, bool shouldLoop) {
     midiFileName = fileName;
     midiPort = portNumber;
     doLoop = shouldLoop;
     clean();
 }
 
-void ofxThreadedMidiPlayer::dispatchMidiEvent( float currentTime, float timeDelta, vector<unsigned char>& message){
+
+void ofxThreadedMidiPlayer::dispatchMidiEvent( float currentTime, float timeDelta, vector<unsigned char>& message) {
     ofxMidiMessage midiMessage(&message);
 
-    if((message.at(0)) >= MIDI_SYSEX) {
+    if ((message.at(0)) >= MIDI_SYSEX) {
         midiMessage.status = (MidiStatus)(message.at(0) & 0xFF);
         midiMessage.channel = 0;
     } else {
         midiMessage.status = (MidiStatus) (message.at(0) & 0xF0);
-        midiMessage.channel = (int) (message.at(0) & 0x0F)+1;
+        midiMessage.channel = (int) (message.at(0) & 0x0F) + 1;
     }
 
     midiMessage.deltatime = timeDelta;// deltatime;// * 1000; // convert s to ms
     midiMessage.portNum = midiPort;
-   // midiMessage.portName = portName;
+    // midiMessage.portName = portName;
 
-    switch(midiMessage.status) {
-        case MIDI_NOTE_ON :
-        case MIDI_NOTE_OFF:
-            midiMessage.pitch = (int) message.at(1);
-            midiMessage.velocity = (int) message.at(2);
-            break;
-        case MIDI_CONTROL_CHANGE:
-            midiMessage.control = (int) message.at(1);
-            midiMessage.value = (int) message.at(2);
-            break;
-        case MIDI_PROGRAM_CHANGE:
-        case MIDI_AFTERTOUCH:
-            midiMessage.value = (int) message.at(1);
-            break;
-        case MIDI_PITCH_BEND:
-            midiMessage.value = (int) (message.at(2) << 7) +
-            (int) message.at(1); // msb + lsb
-            break;
-        case MIDI_POLY_AFTERTOUCH:
-            midiMessage.pitch = (int) message.at(1);
-            midiMessage.value = (int) message.at(2);
-            break;
-        default:
-            break;
+    switch (midiMessage.status) {
+    case MIDI_NOTE_ON :
+    case MIDI_NOTE_OFF:
+        midiMessage.pitch = (int) message.at(1);
+        midiMessage.velocity = (int) message.at(2);
+        break;
+    case MIDI_CONTROL_CHANGE:
+        midiMessage.control = (int) message.at(1);
+        midiMessage.value = (int) message.at(2);
+        break;
+    case MIDI_PROGRAM_CHANGE:
+    case MIDI_AFTERTOUCH:
+        midiMessage.value = (int) message.at(1);
+        break;
+    case MIDI_PITCH_BEND:
+        midiMessage.value = (int) (message.at(2) << 7) +
+                            (int) message.at(1); // msb + lsb
+        break;
+    case MIDI_POLY_AFTERTOUCH:
+        midiMessage.pitch = (int) message.at(1);
+        midiMessage.value = (int) message.at(2);
+        break;
+    default:
+        break;
     }
 
     ofNotifyEvent(midiEvent, midiMessage, this);
 
 }
-void ofxThreadedMidiPlayer::threadedFunction(){
-    while(isThreadRunning()){
+
+
+void ofxThreadedMidiPlayer::threadedFunction() {
+    while (isThreadRunning()) {
 
         init();
 
@@ -120,38 +131,37 @@ void ofxThreadedMidiPlayer::threadedFunction(){
         jdksmidi::MIDITimedBigMessage event;
         int eventTrack = 0;
 
-        for ( ; currentTime < max_time && isThreadRunning(); currentTime += 10. ){
+        for ( ; currentTime < maxTime && isThreadRunning(); currentTime += 10. ) {
             // find all events that came before or a the current time
-            while ( nextEventTime <= currentTime ){
+            while ( nextEventTime <= currentTime ) {
                 myTime++;
-                if (myTime <currentTime){
+                if (myTime < currentTime) {
                     sleep(1);
                     continue;
                 }
-                if(sequencer){
-                    if ( sequencer->GetNextEvent ( &eventTrack, &event ) ){
-                        
+                if (sequencer) {
+                    if ( sequencer->GetNextEvent ( &eventTrack, &event ) ) {
+
                         //ofLog ( OF_LOG_VERBOSE,
-                         //      "currentTime=%06.0f : nextEventTime=%06.0f : eventTrack=%02d",
-                           //    currentTime, nextEventTime, eventTrack );
-                        jdksmidi::MIDITimedBigMessage *msg=&event;
-                        if (msg->GetLength() > 0)
-                        {
+                        //      "currentTime=%06.0f : nextEventTime=%06.0f : eventTrack=%02d",
+                        //    currentTime, nextEventTime, eventTrack );
+                        jdksmidi::MIDITimedBigMessage *msg = &event;
+                        if (msg->GetLength() > 0) {
                             vector<unsigned char> message;
                             message.push_back(msg->GetStatus());
-                            if (msg->GetLength()>0) message.push_back(msg->GetByte1());
-                            if (msg->GetLength()>1) message.push_back(msg->GetByte2());
-                            if (msg->GetLength()>2) message.push_back(msg->GetByte3());
-                            if (msg->GetLength()>3) message.push_back(msg->GetByte4());
-                            if (msg->GetLength()>4) message.push_back(msg->GetByte5());
+                            if (msg->GetLength() > 0) message.push_back(msg->GetByte1());
+                            if (msg->GetLength() > 1) message.push_back(msg->GetByte2());
+                            if (msg->GetLength() > 2) message.push_back(msg->GetByte3());
+                            if (msg->GetLength() > 3) message.push_back(msg->GetByte4());
+                            if (msg->GetLength() > 4) message.push_back(msg->GetByte5());
                             message.resize(msg->GetLength());
-                            midiout->sendMessage(&message);
-                            
-                            dispatchMidiEvent(currentTime, currentTime - nextEventTime,message);
-                            
+                            midiOut->sendMessage(&message);
+
+                            dispatchMidiEvent(currentTime, currentTime - nextEventTime, message);
+
                             DumpMIDITimedBigMessage ( event );
                         }
-                        if ( !sequencer->GetNextEventTimeMs ( &nextEventTime ) ){
+                        if ( !sequencer->GetNextEventTimeMs ( &nextEventTime ) ) {
                             ofLogVerbose("NO MORE EVENTS FOR SEQUENCE, LAST TIME CHECKED IS: " ,   ofToString(nextEventTime) );
                         }
                     }
@@ -160,45 +170,45 @@ void ofxThreadedMidiPlayer::threadedFunction(){
         }
         count++;
 
-        if(doLoop)
-        {
+        if (doLoop) {
             isReady = true;
-        }else {
-
+        } else {
             isReady = false;
         }
     }
 }
-void ofxThreadedMidiPlayer::clean(){
+
+
+void ofxThreadedMidiPlayer::clean() {
     ofLogVerbose("ofxThreadedMidiPlayer::clean") << "Function Called.";
-    if(tracks){
+    if (tracks) {
         delete tracks;
         tracks = NULL;
     }
-    if(sequencer){
+    if (sequencer) {
         delete sequencer;
         sequencer = NULL;
     }
-    //        if(lastTimedBigMessage){
+    //        if(lastTimedBigMessage) {
     //            delete lastTimedBigMessage;
     //            lastTimedBigMessage = NULL;
     //        }
-    if(midiout){
-        delete midiout;
-        midiout = NULL;
+    if (midiOut) {
+        delete midiOut;
+        midiOut = NULL;
     }
-    bIsInited = false;
+    isInited = false;
 }
 
-void ofxThreadedMidiPlayer::init(){
-    if(!bIsInited){
+
+void ofxThreadedMidiPlayer::init() {
+    if (!isInited) {
         isReady = false;
         string filePath = ofToDataPath(midiFileName, true);
 
         jdksmidi::MIDIFileReadStreamFile rs ( filePath.c_str() );
 
-        if ( !rs.IsValid() )
-        {
+        if ( !rs.IsValid() ) {
             ofLogError( "ERROR OPENING FILE AT: ",  filePath);
 
         }
@@ -214,7 +224,7 @@ void ofxThreadedMidiPlayer::init(){
         ofLogVerbose("ofxThreadedMidiPlayer::init") << "numMidiTracks: " << numMidiTracks;
         ofLogVerbose("ofxThreadedMidiPlayer::init") << "midiFormat: " << midiFormat;
 
-        if ( reader.Parse() ){
+        if ( reader.Parse() ) {
             ofLogVerbose("ofxThreadedMidiPlayer::init") << "reader parsed!: ";
         }
 
@@ -224,22 +234,22 @@ void ofxThreadedMidiPlayer::init(){
 
         ofLogVerbose( "musicDurationInSeconds is ", ofToString(musicDurationInSeconds));
 
-        midiout=new RtMidiOut();
-        if (midiout->getPortCount()){
-            midiout->openPort(midiPort);
-            ofLogVerbose("Using Port name: " ,   ofToString(midiout->getPortName(0)) );
+        midiOut = new RtMidiOut();
+        if (midiOut->getPortCount()) {
+            midiOut->openPort(midiPort);
+            ofLogVerbose("Using Port name: " ,   ofToString(midiOut->getPortName(0)) );
             //std::cout << "Using Port name: \"" << midiout->getPortName(0)<< "\"" << std::endl;
         }
 
         currentTime = 0.0;
         nextEventTime = 0.0;
-        if (!sequencer->GoToTimeMs ( currentTime )){
+        if (!sequencer->GoToTimeMs ( currentTime )) {
             ofLogError("Couldn't go to time in sequence: " ,   ofToString(currentTime) );
         }
-        if ( !sequencer->GetNextEventTimeMs ( &nextEventTime ) ){
+        if ( !sequencer->GetNextEventTimeMs ( &nextEventTime ) ) {
             ofLogVerbose("No next events for sequence", ofToString(nextEventTime));
         }
-        max_time = (musicDurationInSeconds *1000.);
-        bIsInited = true;
+        maxTime = (musicDurationInSeconds * 1000.);
+        isInited = true;
     }
 }

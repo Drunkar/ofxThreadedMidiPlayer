@@ -1,6 +1,4 @@
-
 #include "ofxThreadedMidiPlayer.h"
-
 
 
 ofxThreadedMidiPlayer::ofxThreadedMidiPlayer(){
@@ -31,9 +29,9 @@ void ofxThreadedMidiPlayer::stop(){
     stopThread();
     waitForThread();
     // clean();
-    
+
 }
-void ofxThreadedMidiPlayer::DumpMIDITimedBigMessage( const MIDITimedBigMessage& msg )
+void ofxThreadedMidiPlayer::DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBigMessage& msg )
 {
     char msgbuf[1024];
     lastTimedBigMessage.Copy(msg);
@@ -50,14 +48,12 @@ void ofxThreadedMidiPlayer::DumpMIDITimedBigMessage( const MIDITimedBigMessage& 
     {
         ofLog(OF_LOG_VERBOSE, "%8ld : %s", msg.GetTime(), msg.MsgToText ( msgbuf ) );
     }
-    
+
     if ( msg.IsSystemExclusive() )
     {
         ofLog(OF_LOG_VERBOSE, "SYSEX length: %d", msg.GetSysEx()->GetLengthSE() );
     }
     //*/
-    
-    
 }
 void ofxThreadedMidiPlayer::start(){
     startThread();
@@ -72,7 +68,7 @@ void ofxThreadedMidiPlayer::setup(string fileName, int portNumber, bool shouldLo
 
 void ofxThreadedMidiPlayer::dispatchMidiEvent( float currentTime, float timeDelta, vector<unsigned char>& message){
     ofxMidiMessage midiMessage(&message);
-    
+
     if((message.at(0)) >= MIDI_SYSEX) {
         midiMessage.status = (MidiStatus)(message.at(0) & 0xFF);
         midiMessage.channel = 0;
@@ -80,11 +76,11 @@ void ofxThreadedMidiPlayer::dispatchMidiEvent( float currentTime, float timeDelt
         midiMessage.status = (MidiStatus) (message.at(0) & 0xF0);
         midiMessage.channel = (int) (message.at(0) & 0x0F)+1;
     }
-    
+
     midiMessage.deltatime = timeDelta;// deltatime;// * 1000; // convert s to ms
     midiMessage.portNum = midiPort;
    // midiMessage.portName = portName;
-    
+
     switch(midiMessage.status) {
         case MIDI_NOTE_ON :
         case MIDI_NOTE_OFF:
@@ -110,21 +106,20 @@ void ofxThreadedMidiPlayer::dispatchMidiEvent( float currentTime, float timeDelt
         default:
             break;
     }
-    
+
     ofNotifyEvent(midiEvent, midiMessage, this);
-    
+
 }
 void ofxThreadedMidiPlayer::threadedFunction(){
     while(isThreadRunning()){
-        
+
         init();
-        
+
         myTime = 0;
-        
-        
-        MIDITimedBigMessage event;
+
+        jdksmidi::MIDITimedBigMessage event;
         int eventTrack = 0;
-        
+
         for ( ; currentTime < max_time && isThreadRunning(); currentTime += 10. ){
             // find all events that came before or a the current time
             while ( nextEventTime <= currentTime ){
@@ -139,7 +134,7 @@ void ofxThreadedMidiPlayer::threadedFunction(){
                         //ofLog ( OF_LOG_VERBOSE,
                          //      "currentTime=%06.0f : nextEventTime=%06.0f : eventTrack=%02d",
                            //    currentTime, nextEventTime, eventTrack );
-                        MIDITimedBigMessage *msg=&event;
+                        jdksmidi::MIDITimedBigMessage *msg=&event;
                         if (msg->GetLength() > 0)
                         {
                             vector<unsigned char> message;
@@ -164,15 +159,14 @@ void ofxThreadedMidiPlayer::threadedFunction(){
             }
         }
         count++;
-        
+
         if(doLoop)
         {
             isReady = true;
         }else {
-            
+
             isReady = false;
         }
-        
     }
 }
 void ofxThreadedMidiPlayer::clean(){
@@ -200,44 +194,43 @@ void ofxThreadedMidiPlayer::init(){
     if(!bIsInited){
         isReady = false;
         string filePath = ofToDataPath(midiFileName, true);
-        
-        MIDIFileReadStreamFile rs ( filePath.c_str() );
-        
+
+        jdksmidi::MIDIFileReadStreamFile rs ( filePath.c_str() );
+
         if ( !rs.IsValid() )
         {
             ofLogError( "ERROR OPENING FILE AT: ",  filePath);
-            
+
         }
-        
-        tracks = new MIDIMultiTrack();
-        MIDIFileReadMultiTrack track_loader ( tracks );
-        MIDIFileRead reader ( &rs, &track_loader );
-        
+
+        tracks = new jdksmidi::MIDIMultiTrack();
+        jdksmidi::MIDIFileReadMultiTrack track_loader ( tracks );
+        jdksmidi::MIDIFileRead reader ( &rs, &track_loader );
+
         int numMidiTracks = reader.ReadNumTracks();
         int midiFormat = reader.GetFormat();
-        
+
         tracks->ClearAndResize( numMidiTracks );
         cout << "numMidiTracks: " << numMidiTracks << endl;
         cout << "midiFormat: " << midiFormat << endl;
-        
+
         if ( reader.Parse() ){
             cout << "reader parsed!: " << endl;
         }
-        
-        
+
         //MIDISequencer seq( &tracks );
-        sequencer = new MIDISequencer ( tracks );//&seq;
+        sequencer = new jdksmidi::MIDISequencer ( tracks );//&seq;
         musicDurationInSeconds = sequencer->GetMusicDurationInSeconds();
-        
+
         ofLogVerbose( "musicDurationInSeconds is ", ofToString(musicDurationInSeconds));
-        
+
         midiout=new RtMidiOut();
         if (midiout->getPortCount()){
             midiout->openPort(midiPort);
             ofLogVerbose("Using Port name: " ,   ofToString(midiout->getPortName(0)) );
             //std::cout << "Using Port name: \"" << midiout->getPortName(0)<< "\"" << std::endl;
         }
-        
+
         currentTime = 0.0;
         nextEventTime = 0.0;
         if (!sequencer->GoToTimeMs ( currentTime )){
@@ -250,4 +243,3 @@ void ofxThreadedMidiPlayer::init(){
         bIsInited = true;
     }
 }
-

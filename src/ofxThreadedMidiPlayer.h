@@ -40,9 +40,12 @@ public:
     void threadedFunction();
     void setup(string fileName, int portNumber, bool shouldLoop = true);
     void DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBigMessage& msg );
+    void setCurrentTimeMs(float currentTime);
 
 protected:
     bool isInited;
+    float updatedCurrentTime;
     void init();
     void dispatchMidiEvent(float currentTime, float timeDelta, vector<unsigned char>& message);
+    void updateCurrentTime();
 };

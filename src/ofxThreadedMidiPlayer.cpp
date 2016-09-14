@@ -28,6 +28,11 @@ ofxThreadedMidiPlayer::~ofxThreadedMidiPlayer() {
 }
 
 
+void ofxThreadedMidiPlayer::start() {
+    startThread();
+}
+
+
 void ofxThreadedMidiPlayer::stop() {
     ofLogVerbose("ofxThreadedMidiPlayer::stop") << "Function Called.";
     stopThread();
@@ -59,11 +64,6 @@ void ofxThreadedMidiPlayer::DumpMIDITimedBigMessage( const jdksmidi::MIDITimedBi
         ofLog(OF_LOG_VERBOSE, "SYSEX length: %d", msg.GetSysEx()->GetLengthSE() );
     }
     //*/
-}
-
-
-void ofxThreadedMidiPlayer::start() {
-    startThread();
 }
 
 
@@ -131,20 +131,28 @@ void ofxThreadedMidiPlayer::threadedFunction() {
         jdksmidi::MIDITimedBigMessage event;
         int eventTrack = 0;
 
-        for ( ; currentTime < maxTime && isThreadRunning(); currentTime += 10. ) {
-            // find all events that came before or a the current time
+        for ( ; currentTime < maxTime && isThreadRunning(); currentTime += 10.) {
+            // find all events that came before or at the current time
+            updateCurrentTime();
             while ( nextEventTime <= currentTime ) {
+                
+                // wait myTime reach currentTime ------------------------------
                 myTime++;
+                // manage read speed by sleep
                 if (myTime < currentTime) {
                     sleep(1);
                     continue;
                 }
+                // ------------------------------------------------------------
+                
+                // myTime > currentTime
+                // find all events that came before or at the current time
                 if (sequencer) {
                     if ( sequencer->GetNextEvent ( &eventTrack, &event ) ) {
 
-                        //ofLog ( OF_LOG_VERBOSE,
-                        //      "currentTime=%06.0f : nextEventTime=%06.0f : eventTrack=%02d",
-                        //    currentTime, nextEventTime, eventTrack );
+                        ofLog ( OF_LOG_VERBOSE,
+                              "currentTime=%06.0f : nextEventTime=%06.0f : eventTrack=%02d",
+                            currentTime, currentTime, eventTrack );
                         jdksmidi::MIDITimedBigMessage *msg = &event;
                         if (msg->GetLength() > 0) {
                             vector<unsigned char> message;
@@ -175,6 +183,18 @@ void ofxThreadedMidiPlayer::threadedFunction() {
         } else {
             isReady = false;
         }
+    }
+}
+
+
+/* Update currentTime if updatedCurrentTime is differ from currentTime. */
+void ofxThreadedMidiPlayer::updateCurrentTime() {
+    if (abs(currentTime - updatedCurrentTime) >= 1000) {
+        sequencer->GoToZero();
+        myTime = updatedCurrentTime;
+        currentTime = updatedCurrentTime;
+        nextEventTime = updatedCurrentTime;
+        sequencer->GoToTimeMs(updatedCurrentTime);
     }
 }
 
@@ -238,11 +258,11 @@ void ofxThreadedMidiPlayer::init() {
         if (midiOut->getPortCount()) {
             midiOut->openPort(midiPort);
             ofLogVerbose("Using Port name: " ,   ofToString(midiOut->getPortName(0)) );
-            //std::cout << "Using Port name: \"" << midiout->getPortName(0)<< "\"" << std::endl;
         }
 
         currentTime = 0.0;
         nextEventTime = 0.0;
+        updatedCurrentTime = 0.0;
         if (!sequencer->GoToTimeMs ( currentTime )) {
             ofLogError("Couldn't go to time in sequence: " ,   ofToString(currentTime) );
         }
@@ -252,4 +272,9 @@ void ofxThreadedMidiPlayer::init() {
         maxTime = (musicDurationInSeconds * 1000.);
         isInited = true;
     }
+}
+
+
+void ofxThreadedMidiPlayer::setCurrentTimeMs(float new_current_time) {
+    updatedCurrentTime = new_current_time;
 }

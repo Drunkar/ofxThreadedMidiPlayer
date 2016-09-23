@@ -121,6 +121,36 @@ void ofxThreadedMidiPlayer::dispatchMidiEvent( float currentTime, float timeDelt
 }
 
 
+void ofxThreadedMidiPlayer::correctMessage(vector<unsigned char> &message) {
+    vector<unsigned char> correctMessage;
+    
+    // reset message or meta event
+    if (message[0] == 0xFF) {
+        correctMessage.push_back(0xFF);
+    } else {
+
+        for (unsigned char c : message) {
+            if (c == 0x04) {
+                if (correctMessage.size() > 0)
+                    correctMessage.pop_back();
+                break;
+            }
+            correctMessage.push_back(c);
+        }
+
+    }
+    message = correctMessage;
+}
+
+
+bool ofxThreadedMidiPlayer::isValid(vector<unsigned char> &message) {
+    for (unsigned char c : message) {
+        if (c == 0x04) return false;
+    }
+    return true;
+}
+
+
 void ofxThreadedMidiPlayer::threadedFunction() {
     while (isThreadRunning()) {
 
@@ -163,11 +193,13 @@ void ofxThreadedMidiPlayer::threadedFunction() {
                             if (msg->GetLength() > 3) message.push_back(msg->GetByte4());
                             if (msg->GetLength() > 4) message.push_back(msg->GetByte5());
                             message.resize(msg->GetLength());
-                            midiOut->sendMessage(&message);
-
-                            dispatchMidiEvent(currentTime, currentTime - nextEventTime, message);
-
-                            DumpMIDITimedBigMessage ( event );
+                            correctMessage(message);
+                            
+                            if (isValid(message)) {
+                                midiOut->sendMessage(&message);
+                                dispatchMidiEvent(currentTime, currentTime - nextEventTime, message);
+                                DumpMIDITimedBigMessage ( event );
+                            }
                         }
                         if ( !sequencer->GetNextEventTimeMs ( &nextEventTime ) ) {
                             ofLogVerbose("NO MORE EVENTS FOR SEQUENCE, LAST TIME CHECKED IS: " ,   ofToString(nextEventTime) );

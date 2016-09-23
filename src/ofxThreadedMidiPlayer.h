@@ -48,4 +48,6 @@ protected:
     void init();
     void dispatchMidiEvent(float currentTime, float timeDelta, vector<unsigned char>& message);
     void updateCurrentTime();
+    void correctMessage(vector<unsigned char>& message);
+    bool isValid(vector<unsigned char>& message);
 };
